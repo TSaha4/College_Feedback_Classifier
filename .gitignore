@@ -1,0 +1,98 @@
+# ── Python ────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.Python
+pip-wheel-metadata/
+
+# Virtual environments
+venv/
+venv310/
+.venv/
+env/
+ENV/
+
+# ── ML / HuggingFace ─────────────────────────────────────────
+# Ignore large model weight files — too big for git
+cat_model/model.safetensors
+cat_model/pytorch_model.bin
+sent_model/model.safetensors
+sent_model/pytorch_model.bin
+
+# Keep model configs & tokenizer files (small, needed for inference)
+!cat_model/config.json
+!cat_model/tokenizer*.json
+!cat_model/tokenizer_config.json
+!cat_model/vocab.txt
+!cat_model/special_tokens_map.json
+!sent_model/config.json
+!sent_model/tokenizer*.json
+!sent_model/tokenizer_config.json
+!sent_model/vocab.json
+!sent_model/merges.txt
+!sent_model/special_tokens_map.json
+
+# Training artifacts
+tmp_cat_checkpoints/
+tmp_sent_checkpoints/
+runs/
+wandb/
+lightning_logs/
+*.ckpt
+*.pt
+checkpoint-*/
+
+# HuggingFace cache
+.cache/
+
+# ── Data ──────────────────────────────────────────────────────
+reviews.json
+
+# ── Node / React (frontend) ───────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+node_modules/
+dist/
+
+# ── Environment & secrets ────────────────────────────────────
+.env
+.env.local
+*.env
+
+# ── IDE & OS ─────────────────────────────────────────────────
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Jupyter ───────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Logs ─────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Old/Debug Scripts & Temp Files ────────────────────────────
+*.zip
+app.py
+app_combined.py
+final_app.py
+test_model.py
+diagnose_model.py
+train_local.py
+train_gpu.py
+repair_tokenizers.py
+streamlit_app.py
