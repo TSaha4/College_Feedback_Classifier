@@ -41,7 +41,7 @@ export default function App() {
       </header>
 
       <main className="page-content">
-        {role === 'student' ? <StudentView /> : role === 'admin' ? <AdminView /> : <ChancellorView />}
+        {role === 'student' ? <StudentView /> : <AdminView />}
       </main>
     </div>
   )
