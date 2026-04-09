@@ -1,18 +1,21 @@
 import { useState } from 'react'
 
 const SENT_CLASS = { Positive: 'text-pos', Negative: 'text-neg', Neutral: 'text-neu' }
-const SENT_PILL  = { Positive: 'pill-pos', Negative: 'pill-neg', Neutral: 'pill-neu' }
 
 export default function StudentView() {
-  const [author,  setAuthor]  = useState('')
-  const [text,    setText]    = useState('')
+  const [author, setAuthor] = useState('')
+  const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
-  const [result,  setResult]  = useState(null)
-  const [error,   setError]   = useState('')
+  const [result, setResult] = useState(null)
+  const [error, setError] = useState('')
 
-  async function handleSubmit(e) {
-    e.preventDefault()
-    if (!text.trim()) { setError('Please write something first.'); return }
+  async function handleSubmit(event) {
+    event.preventDefault()
+    if (!text.trim()) {
+      setError('Please write a review before submitting.')
+      return
+    }
+
     setError('')
     setLoading(true)
     setResult(null)
@@ -23,7 +26,7 @@ export default function StudentView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: text.trim(), author: author.trim() || 'Anonymous' }),
       })
-      if (!res.ok) throw new Error('Server error. Is the backend running?')
+      if (!res.ok) throw new Error('Server error. Please make sure the backend is running.')
       const data = await res.json()
       setResult(data)
     } catch (err) {
@@ -41,128 +44,122 @@ export default function StudentView() {
   }
 
   return (
-    <div>
-      {/* Title */}
-      <div style={{ marginBottom: '1.75rem' }}>
-        <h1 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text)', marginBottom: '0.3rem' }}>
-          post a review
-        </h1>
-        <p className="text-dim" style={{ fontSize: '0.82rem' }}>
-          write about academics, facilities, faculty, hostel, mess, or anything else — our AI will classify it.
-        </p>
-      </div>
-
-      {/* Form card */}
-      <div className="card">
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">your name (optional)</label>
-            <input
-              className="form-input"
-              type="text"
-              placeholder="Anonymous"
-              value={author}
-              onChange={e => setAuthor(e.target.value)}
-              maxLength={60}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">your review</label>
-            <textarea
-              className="form-textarea"
-              placeholder="The faculty in the CS department is extremely helpful and always available during office hours..."
-              value={text}
-              onChange={e => { setText(e.target.value); setError('') }}
-              maxLength={1000}
-            />
-            <div className="text-dim mono" style={{ fontSize: '0.72rem', textAlign: 'right', marginTop: '4px' }}>
-              {text.length} / 1000
-            </div>
-          </div>
-
-          {error && (
-            <div style={{ color: 'var(--negative)', fontSize: '0.82rem', marginBottom: '0.75rem' }}>
-              ⚠ {error}
-            </div>
-          )}
-
-          <button
-            className="btn btn-primary btn-full"
-            type="submit"
-            disabled={loading}
-          >
-            {loading
-              ? <><span className="spinner" /> analyzing…</>
-              : '✦ analyze & submit'
-            }
-          </button>
-        </form>
-      </div>
-
-      {/* Result */}
-      {result && (
-        <div className="result-box">
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginBottom: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
-            ai prediction
-          </div>
-
-          <div className="result-chips">
-            {/* Category chip */}
-            <div className="chip">
-              <div className="chip-label">category</div>
-              <div className="chip-value text-accent">{result.category}</div>
-              <div className="chip-conf">{result.cat_confidence}% confidence</div>
-            </div>
-
-            {/* Sentiment chip */}
-            <div className="chip">
-              <div className="chip-label">sentiment</div>
-              <div className={`chip-value ${SENT_CLASS[result.sentiment]}`}>{result.sentiment}</div>
-              <div className="chip-conf">{result.sent_confidence}% confidence</div>
-            </div>
-          </div>
-
-          {/* Category probability breakdown */}
-          {result.all_cats && (
-            <div>
-              <div className="text-dim" style={{ fontSize: '0.72rem', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                category probabilities
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                {Object.entries(result.all_cats)
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([cat, prob]) => (
-                    <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div className="mono text-dim" style={{ fontSize: '0.72rem', width: '100px' }}>{cat}</div>
-                      <div style={{
-                        flex: 1, height: '4px', borderRadius: '99px',
-                        background: 'var(--border)', overflow: 'hidden'
-                      }}>
-                        <div style={{
-                          width: `${prob}%`, height: '100%',
-                          background: cat === result.category
-                            ? 'var(--accent)'
-                            : 'rgba(136,192,208,0.28)',
-                          borderRadius: '99px', transition: 'width 0.6s ease'
-                        }} />
-                      </div>
-                      <div className="mono text-dim" style={{ fontSize: '0.72rem', width: '38px', textAlign: 'right' }}>
-                        {prob}%
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-            <button className="btn btn-ghost" onClick={resetForm} style={{ fontSize: '0.8rem' }}>
-              ↩ submit another
-            </button>
-          </div>
+    <div className="student-shell">
+      <section className="student-hero student-hero-simple">
+        <div className="student-hero-copy">
+          <div className="eyebrow">Student Portal</div>
+          <h1>Share your campus feedback.</h1>
+          <p>
+            Submit a short review and CampusLens will identify the category, sentiment, and confidence behind it.
+          </p>
         </div>
-      )}
+      </section>
+
+      <section className="student-grid">
+        <div className="card student-form-card">
+          <div className="card-title">Submit Review</div>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label">Your Name</label>
+              <input
+                className="form-input"
+                type="text"
+                placeholder="Anonymous"
+                value={author}
+                onChange={event => setAuthor(event.target.value)}
+                maxLength={60}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Your Review</label>
+              <textarea
+                className="form-textarea student-textarea"
+                placeholder="Example: The faculty is supportive, but hostel maintenance needs improvement."
+                value={text}
+                onChange={event => {
+                  setText(event.target.value)
+                  setError('')
+                }}
+                maxLength={1000}
+              />
+              <div className="student-form-meta">
+                <span>Be specific for better predictions.</span>
+                <span className="mono">{text.length} / 1000</span>
+              </div>
+            </div>
+
+            {error && <div className="form-error">{error}</div>}
+
+            <div className="student-actions">
+              <button className="btn btn-primary" type="submit" disabled={loading}>
+                {loading ? <><span className="spinner" /> Analyzing...</> : 'Analyze and Submit'}
+              </button>
+              <button className="btn btn-ghost" type="button" onClick={resetForm}>
+                Clear
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div className="student-result-panel">
+          {result ? (
+            <div className="result-box student-result-box">
+              <div className="result-header">
+                <div>
+                  <div className="card-title">Prediction Summary</div>
+                  <h2>Review analyzed successfully.</h2>
+                </div>
+                <button className="btn btn-ghost" onClick={resetForm}>
+                  Submit Another
+                </button>
+              </div>
+
+              <div className="result-chips">
+                <div className="chip feature-chip">
+                  <div className="chip-label">Category</div>
+                  <div className="chip-value text-accent">{result.category}</div>
+                  <div className="chip-conf">{result.cat_confidence}% confidence</div>
+                </div>
+
+                <div className="chip feature-chip">
+                  <div className="chip-label">Sentiment</div>
+                  <div className={`chip-value ${SENT_CLASS[result.sentiment]}`}>{result.sentiment}</div>
+                  <div className="chip-conf">{result.sent_confidence}% confidence</div>
+                </div>
+              </div>
+
+              {result.all_cats && (
+                <div className="probability-card">
+                  <div className="card-title">Category Probabilities</div>
+                  <div className="probability-list">
+                    {Object.entries(result.all_cats)
+                      .sort((left, right) => right[1] - left[1])
+                      .map(([category, probability]) => (
+                        <div key={category} className="probability-row">
+                          <div className="probability-label">{category}</div>
+                          <div className="probability-track">
+                            <div
+                              className={`probability-fill ${category === result.category ? 'is-winner' : ''}`}
+                              style={{ width: `${probability}%` }}
+                            />
+                          </div>
+                          <div className="probability-value">{probability}%</div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="student-empty-state">
+              <div className="card-title">Prediction Summary</div>
+              <h2>Your result will appear here.</h2>
+              <p>After submission, you will see the detected category, sentiment, and confidence breakdown.</p>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   )
 }
