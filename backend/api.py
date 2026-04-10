@@ -8,9 +8,11 @@ import base64
 import json
 import math
 import os
+import re
 import zlib
 from collections import Counter
 from datetime import datetime
+from typing import Optional
 
 import pandas as pd
 import torch
@@ -44,6 +46,38 @@ ID2CAT = {
 ID2SENT = {0: "Negative", 1: "Neutral", 2: "Positive"}
 CAT2ID = {label: idx for idx, label in ID2CAT.items()}
 SENT2ID = {label: idx for idx, label in ID2SENT.items()}
+MULTI_CATEGORY_GAP = 12.0
+SEGMENT_SPLIT_PATTERN = re.compile(r"\b(?:but|however|although|though|while|yet)\b|[.;]+", re.IGNORECASE)
+NEGATIVE_ACTIONS = {
+    "Academics": [
+        "Audit timetable pressure, deadlines, and course pacing with class reps.",
+        "Offer doubt-clearing slots or tutorial sessions for the most reported subjects.",
+    ],
+    "Administration": [
+        "Review approval bottlenecks and publish clearer process timelines.",
+        "Create a single contact point for unresolved student issues.",
+    ],
+    "Facilities": [
+        "Inspect high-traffic infrastructure and assign quick-fix maintenance items.",
+        "Track recurring facility complaints weekly until the backlog drops.",
+    ],
+    "Faculty": [
+        "Share student concerns with department heads and review classroom conduct patterns.",
+        "Arrange feedback meetings focused on fairness, clarity, and approachability.",
+    ],
+    "Hostel": [
+        "Check cleanliness, repairs, and water/electricity issues floor by floor.",
+        "Set a visible response SLA for hostel complaints and publish resolution status.",
+    ],
+    "Mess": [
+        "Review food quality, hygiene, and menu repetition with the mess committee.",
+        "Run sample tasting and collect weekly feedback before changing vendors or menus.",
+    ],
+    "Others": [
+        "Manually review these comments to identify a missing category or repeated issue.",
+        "Group similar complaints into an action list for the next admin review.",
+    ],
+}
 
 app = FastAPI(title="CampusLens API")
 
@@ -150,13 +184,47 @@ def predict_labels(text: str):
     }
 
 
+def detect_categories(text: str, prediction: Optional[dict] = None):
+    prediction = prediction or predict_labels(text)
+    ranked_categories = sorted(
+        prediction["all_cats"].items(),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+
+    detected = []
+    if ranked_categories:
+        top_label, top_score = ranked_categories[0]
+        detected.append(top_label)
+        for label, score in ranked_categories[1:]:
+            if top_score - score <= MULTI_CATEGORY_GAP:
+                detected.append(label)
+
+    segments = [
+        segment.strip(" ,")
+        for segment in SEGMENT_SPLIT_PATTERN.split(text.strip())
+        if segment.strip(" ,")
+    ]
+    if len(segments) > 1:
+        for segment in segments:
+            segment_prediction = predict_labels(segment)
+            label = segment_prediction["category"]
+            if label not in detected:
+                detected.append(label)
+
+    return detected[:3]
+
+
 def build_review_record(text: str, author: str):
     prediction = predict_labels(text)
+    detected_categories = detect_categories(text, prediction)
     return {
         "id": datetime.now().isoformat(),
         "author": author.strip() or "Anonymous",
         "text": text.strip(),
         "category": prediction["category"],
+        "detected_categories": detected_categories,
+        "is_multi_category": len(detected_categories) > 1,
         "sentiment": prediction["sentiment"],
         "cat_confidence": prediction["cat_confidence"],
         "sent_confidence": prediction["sent_confidence"],
@@ -168,25 +236,26 @@ def build_review_record(text: str, author: str):
 def get_leaderboard_stats(reviews):
     stats = {}
     for review in reviews:
-        category = review["category"]
-        if category not in stats:
-            stats[category] = {
-                "category": category,
-                "total": 0,
-                "positive": 0,
-                "negative": 0,
-                "neutral": 0,
-                "score": 0,
-                "avg_cat_confidence": 0.0,
-                "avg_sent_confidence": 0.0,
-            }
+        review_categories = review.get("detected_categories") or [review["category"]]
+        for category in review_categories:
+            if category not in stats:
+                stats[category] = {
+                    "category": category,
+                    "total": 0,
+                    "positive": 0,
+                    "negative": 0,
+                    "neutral": 0,
+                    "score": 0,
+                    "avg_cat_confidence": 0.0,
+                    "avg_sent_confidence": 0.0,
+                }
 
-        stats[category]["total"] += 1
-        sentiment_key = review["sentiment"].lower()
-        stats[category][sentiment_key] += 1
-        stats[category]["score"] += 1 if sentiment_key == "positive" else -1 if sentiment_key == "negative" else 0
-        stats[category]["avg_cat_confidence"] += review.get("cat_confidence", 0.0)
-        stats[category]["avg_sent_confidence"] += review.get("sent_confidence", 0.0)
+            stats[category]["total"] += 1
+            sentiment_key = review["sentiment"].lower()
+            stats[category][sentiment_key] += 1
+            stats[category]["score"] += 1 if sentiment_key == "positive" else -1 if sentiment_key == "negative" else 0
+            stats[category]["avg_cat_confidence"] += review.get("cat_confidence", 0.0)
+            stats[category]["avg_sent_confidence"] += review.get("sent_confidence", 0.0)
 
     for item in stats.values():
         total = max(1, item["total"])
@@ -386,6 +455,7 @@ def build_summary_insights(reviews, leaderboard, clusters):
     total_reviews = len(reviews)
     negative_reviews = [review for review in reviews if review.get("sentiment") == "Negative"]
     positive_reviews = [review for review in reviews if review.get("sentiment") == "Positive"]
+    multi_category_reviews = [review for review in reviews if review.get("is_multi_category")]
     low_confidence = [
         review
         for review in reviews
@@ -431,6 +501,10 @@ def build_summary_insights(reviews, leaderboard, clusters):
             "label": "Detected themes",
             "value": str(clusters["cluster_count"]),
         },
+        {
+            "label": "Multi-topic reviews",
+            "value": str(len(multi_category_reviews)),
+        },
     ]
 
     headline_parts = []
@@ -447,13 +521,44 @@ def build_summary_insights(reviews, leaderboard, clusters):
     }
 
 
+def build_negative_action_plan(leaderboard):
+    negative_rows = [
+        row for row in leaderboard
+        if row.get("negative", 0) > 0
+    ]
+    negative_rows.sort(
+        key=lambda row: (
+            row["negative"] / max(1, row["total"]),
+            row["negative"],
+        ),
+        reverse=True,
+    )
+
+    plan = []
+    for row in negative_rows[:4]:
+        actions = NEGATIVE_ACTIONS.get(row["category"], NEGATIVE_ACTIONS["Others"])
+        plan.append(
+            {
+                "category": row["category"],
+                "negative": row["negative"],
+                "total": row["total"],
+                "share": round(row["negative"] / max(1, row["total"]) * 100, 1),
+                "actions": actions,
+            }
+        )
+    return plan
+
+
 def build_analytics_snapshot():
     reviews = load_reviews()
     leaderboard = get_leaderboard_stats(reviews)
     clusters = build_topic_clusters(reviews)
 
     sentiment_counts = Counter(review.get("sentiment", "Neutral") for review in reviews)
-    category_counts = Counter(review.get("category", "Others") for review in reviews)
+    detected_category_counts = Counter()
+    for review in reviews:
+        for category in review.get("detected_categories") or [review.get("category", "Others")]:
+            detected_category_counts[category] += 1
     confidence_points = [
         {
             "category": review.get("category", "Others"),
@@ -474,7 +579,7 @@ def build_analytics_snapshot():
         {
             "overview": {
                 "total_reviews": len(reviews),
-                "categories": len(category_counts),
+                "categories": len(detected_category_counts),
                 "avg_cat_confidence": round(
                     sum(review.get("cat_confidence", 0) for review in reviews) / max(1, len(reviews)),
                     1,
@@ -489,14 +594,12 @@ def build_analytics_snapshot():
                 for label in ID2SENT.values()
             ],
             "category_distribution": [
-                {"label": label, "value": category_counts.get(label, 0)}
+                {"label": label, "value": detected_category_counts.get(label, 0)}
                 for label in ID2CAT.values()
-                if category_counts.get(label, 0)
+                if detected_category_counts.get(label, 0)
             ],
             "leaderboard": leaderboard,
-            "topic_clusters": clusters,
-            "confidence_points": confidence_points,
-            "trend": trend,
+            "action_plan": build_negative_action_plan(leaderboard),
             "summary": build_summary_insights(reviews, leaderboard, clusters),
         }
     )
@@ -551,6 +654,8 @@ def reassess_reviews():
             continue
         prediction = predict_labels(text)
         review["category"] = prediction["category"]
+        review["detected_categories"] = detect_categories(text, prediction)
+        review["is_multi_category"] = len(review["detected_categories"]) > 1
         review["sentiment"] = prediction["sentiment"]
         review["cat_confidence"] = prediction["cat_confidence"]
         review["sent_confidence"] = prediction["sent_confidence"]

@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 
-const SENTIMENT_COLORS = {
-  Positive: 'var(--positive)',
-  Neutral: 'var(--neutral)',
-  Negative: 'var(--negative)',
-}
-
 export default function AdminView() {
   const [tab, setTab] = useState('overview')
   const [reviews, setReviews] = useState([])
@@ -68,11 +62,14 @@ export default function AdminView() {
       || review.text.toLowerCase().includes(search.toLowerCase())
       || review.author.toLowerCase().includes(search.toLowerCase())
     const matchSent = !filterSent || review.sentiment === filterSent
-    const matchCat = !filterCat || review.category === filterCat
+    const reviewCategories = review.detected_categories || [review.category]
+    const matchCat = !filterCat || reviewCategories.includes(filterCat)
     return matchSearch && matchSent && matchCat
   })
 
-  const categories = [...new Set(reviews.map(review => review.category))].sort()
+  const categories = [...new Set(
+    reviews.flatMap(review => review.detected_categories || [review.category]),
+  )].sort()
   const overviewCards = analytics ? [
     { label: 'total reviews', value: analytics.overview.total_reviews },
     { label: 'tracked categories', value: analytics.overview.categories },
@@ -156,7 +153,7 @@ export default function AdminView() {
 function OverviewPanel({ analytics }) {
   return (
     <div className="panel-stack">
-      <section className="summary-grid">
+      <section className="double-grid">
         <div className="card summary-card">
           <div className="card-title">executive summary</div>
           <h2 className="summary-headline">{analytics.summary.headline}</h2>
@@ -176,38 +173,14 @@ function OverviewPanel({ analytics }) {
         </div>
 
         <div className="card">
-          <div className="card-title">sentiment mix</div>
-          <ChartList data={analytics.sentiment_distribution} />
-        </div>
-      </section>
-
-      <section className="double-grid">
-        <div className="card">
-          <div className="card-title">category distribution</div>
-          <ChartList data={analytics.category_distribution} />
-        </div>
-
-        <div className="card">
-          <div className="card-title">submission trend</div>
-          <TrendBars data={analytics.trend} />
-        </div>
-      </section>
-
-      <section className="double-grid">
-        <div className="card">
-          <div className="card-title">leaderboard snapshot</div>
-          <LeaderboardMini data={analytics.leaderboard} />
-        </div>
-
-        <div className="card">
-          <div className="card-title">confidence radar</div>
-          <ConfidenceList points={analytics.confidence_points} />
+          <div className="card-title">negative action plan</div>
+          <ActionPlanList items={analytics.action_plan} />
         </div>
       </section>
 
       <section className="card">
-        <div className="card-title">topic clusters</div>
-        <TopicClusters clusters={analytics.topic_clusters} />
+        <div className="card-title">priority categories</div>
+          <LeaderboardMini data={analytics.leaderboard} />
       </section>
     </div>
   )
@@ -227,28 +200,6 @@ function PerformancePanel({ evaluation }) {
           subtitle={`${evaluation.holdout_size.sentiment} holdout reviews`}
           metrics={evaluation.sentiment}
         />
-      </section>
-
-      <section className="double-grid">
-        <div className="card">
-          <div className="card-title">category confusion matrix</div>
-          <ConfusionMatrix matrix={evaluation.category.confusion_matrix} />
-        </div>
-        <div className="card">
-          <div className="card-title">sentiment confusion matrix</div>
-          <ConfusionMatrix matrix={evaluation.sentiment.confusion_matrix} />
-        </div>
-      </section>
-
-      <section className="double-grid">
-        <div className="card">
-          <div className="card-title">category error samples</div>
-          <ErrorList items={evaluation.category.sample_errors} />
-        </div>
-        <div className="card">
-          <div className="card-title">sentiment error samples</div>
-          <ErrorList items={evaluation.sentiment.sample_errors} />
-        </div>
       </section>
     </div>
   )
@@ -310,6 +261,7 @@ function ReviewsFeed({
                 </span>
                 {review.rusticated && <span className="pill pill-neg">banned</span>}
                 <span className="pill pill-cat">{review.category}</span>
+                {review.is_multi_category && <span className="pill pill-multi">multi-topic</span>}
                 <span className={`pill ${review.sentiment === 'Positive' ? 'pill-pos' : review.sentiment === 'Negative' ? 'pill-neg' : 'pill-neu'}`}>
                   {review.sentiment}
                 </span>
@@ -325,9 +277,28 @@ function ReviewsFeed({
 
               <div className="review-text">"{review.text}"</div>
 
+              {!!review.detected_categories?.length && (
+                <div className="review-tags-row">
+                  {review.detected_categories.map(category => (
+                    <span
+                      key={`${review.id}-${category}`}
+                      className={`pill ${category === review.category ? 'pill-cat' : 'pill-multi-soft'}`}
+                    >
+                      {category}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {review.sentiment === 'Negative' && (
+                <div className="review-suggestion">
+                  <strong>Suggested admin action:</strong> {getReviewSuggestion(review)}
+                </div>
+              )}
+
               <div className="review-metric-row">
-                <MetricChip label="category confidence" value={`${review.cat_confidence}%`} />
-                <MetricChip label="sentiment confidence" value={`${review.sent_confidence}%`} />
+                <MetricChip label="category" value={`${review.cat_confidence}%`} />
+                <MetricChip label="sentiment" value={`${review.sent_confidence}%`} />
                 <MetricChip label="submitted" value={review.timestamp} />
               </div>
             </div>
@@ -370,103 +341,9 @@ function ModelMetricCard({ title, subtitle, metrics }) {
   )
 }
 
-function ConfusionMatrix({ matrix }) {
-  const maxValue = Math.max(...matrix.matrix.flat(), 1)
-
-  return (
-    <div className="matrix-wrap">
-      <div className="matrix-row">
-        <div className="matrix-corner" />
-        {matrix.labels.map(label => (
-          <div className="matrix-label" key={label}>{label}</div>
-        ))}
-      </div>
-      {matrix.matrix.map((row, rowIndex) => (
-        <div className="matrix-row" key={matrix.labels[rowIndex]}>
-          <div className="matrix-label matrix-side">{matrix.labels[rowIndex]}</div>
-          {row.map((value, colIndex) => (
-            <div
-              key={`${rowIndex}-${colIndex}`}
-              className="matrix-cell"
-              style={{ opacity: 0.25 + (value / maxValue) * 0.75 }}
-            >
-              {value}
-            </div>
-          ))}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function ErrorList({ items }) {
-  if (!items.length) {
-    return <div className="empty-inline">No mistakes in the sampled holdout set.</div>
-  }
-
-  return (
-    <div className="error-list">
-      {items.map((item, index) => (
-        <div className="error-item" key={`${item.actual}-${item.predicted}-${index}`}>
-          <div className="error-meta">
-            <span className="pill pill-neg">{item.actual}</span>
-            <span className="pill pill-neu">{item.predicted}</span>
-            <span className="mono text-dim">{item.confidence}%</span>
-          </div>
-          <div className="error-text">{item.text}</div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function ChartList({ data }) {
-  const maxValue = Math.max(...data.map(item => item.value), 1)
-
-  return (
-    <div className="chart-list">
-      {data.map(item => (
-        <div className="chart-row" key={item.label}>
-          <div className="chart-label">{item.label}</div>
-          <div className="chart-track">
-            <div
-              className="chart-fill"
-              style={{
-                width: `${(item.value / maxValue) * 100}%`,
-                background: SENTIMENT_COLORS[item.label] || 'var(--accent)',
-              }}
-            />
-          </div>
-          <div className="chart-value">{item.value}</div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function TrendBars({ data }) {
-  if (!data.length) {
-    return <div className="empty-inline">Need dated reviews to show a trend.</div>
-  }
-
-  const maxValue = Math.max(...data.map(item => item.count), 1)
-
-  return (
-    <div className="trend-bars">
-      {data.map(item => (
-        <div className="trend-bar-wrap" key={item.date}>
-          <div className="trend-bar" style={{ height: `${36 + (item.count / maxValue) * 120}px` }} />
-          <div className="trend-count">{item.count}</div>
-          <div className="trend-label">{item.date.slice(5)}</div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 function LeaderboardMini({ data }) {
   const topRows = [...data]
-    .sort((left, right) => right.score - left.score)
+    .sort((left, right) => (right.negative / Math.max(1, right.total)) - (left.negative / Math.max(1, left.total)))
     .slice(0, 5)
 
   return (
@@ -475,12 +352,10 @@ function LeaderboardMini({ data }) {
         <div className="leaderboard-row" key={row.category}>
           <div>
             <strong>{row.category}</strong>
-            <div className="text-dim">{row.total} reviews</div>
+            <div className="text-dim">{row.negative} negative of {row.total}</div>
           </div>
           <div className="leaderboard-metrics">
-            <span className="text-pos">{row.positive} pos</span>
-            <span className="text-neg">{row.negative} neg</span>
-            <span className="mono">{row.score > 0 ? '+' : ''}{row.score}</span>
+            <span className="text-neg">{Math.round((row.negative / Math.max(1, row.total)) * 100)}% neg</span>
           </div>
         </div>
       ))}
@@ -488,70 +363,41 @@ function LeaderboardMini({ data }) {
   )
 }
 
-function ConfidenceList({ points }) {
-  if (!points.length) {
-    return <div className="empty-inline">Confidence analytics will appear after a few reviews.</div>
+function ActionPlanList({ items }) {
+  if (!items.length) {
+    return <div className="empty-inline">No negative feedback trends yet.</div>
   }
 
   return (
-    <div className="confidence-list">
-      {points.map((point, index) => (
-        <div className="confidence-row" key={`${point.category}-${index}`}>
-          <div>
-            <strong>{point.category}</strong>
-            <div className="text-dim">{point.sentiment}</div>
+    <div className="action-plan-list">
+      {items.map(item => (
+        <div className="action-plan-item" key={item.category}>
+          <div className="action-plan-head">
+            <strong>{item.category}</strong>
+            <span className="pill pill-neg">{item.share}% negative</span>
           </div>
-          <div className="confidence-bars">
-            <div className="mini-track">
-              <div className="mini-fill" style={{ width: `${point.cat_confidence}%` }} />
-            </div>
-            <div className="mini-track secondary">
-              <div className="mini-fill" style={{ width: `${point.sent_confidence}%`, background: 'var(--positive)' }} />
-            </div>
-          </div>
+          <div className="text-dim action-plan-meta">{item.negative} of {item.total} reviews are negative</div>
+          {item.actions.map(action => (
+            <div className="recommendation-item compact" key={action}>{action}</div>
+          ))}
         </div>
       ))}
     </div>
   )
 }
 
-function TopicClusters({ clusters }) {
-  if (!clusters.clusters.length) {
-    return <div className="empty-inline">Need at least three reviews to discover recurring themes.</div>
+function getReviewSuggestion(review) {
+  const primaryCategory = (review.detected_categories && review.detected_categories[0]) || review.category
+  const suggestions = {
+    Academics: 'review workload, class scheduling, and support sessions for the affected subjects.',
+    Administration: 'check process delays, communication gaps, and unresolved office requests.',
+    Facilities: 'inspect the reported infrastructure issue and assign a maintenance follow-up.',
+    Faculty: 'review teaching conduct concerns with the department and collect section-wise feedback.',
+    Hostel: 'verify hostel operations, cleanliness, and maintenance response for that block.',
+    Mess: 'inspect food quality, hygiene, and menu consistency with the mess team.',
+    Others: 'manually review this complaint and assign it to the right team for follow-up.',
   }
-
-  return (
-    <div className="cluster-grid">
-      {clusters.clusters.map(cluster => (
-        <div className="cluster-card" key={cluster.id}>
-          <div className="cluster-head">
-            <strong>{cluster.title}</strong>
-            <span className="pill pill-cat">{cluster.size} reviews</span>
-          </div>
-          <div className="keyword-row">
-            {cluster.keywords.map(keyword => (
-              <span className="keyword-chip" key={keyword}>{keyword}</span>
-            ))}
-          </div>
-          <div className="cluster-meta">
-            <span>top category: {cluster.top_category}</span>
-            <span>positive: {cluster.sentiment_mix.Positive || 0}</span>
-            <span>negative: {cluster.sentiment_mix.Negative || 0}</span>
-          </div>
-          <div className="cluster-examples">
-            {cluster.examples.map(example => (
-              <div className="cluster-example" key={example.id}>
-                <span className={`pill ${example.sentiment === 'Positive' ? 'pill-pos' : example.sentiment === 'Negative' ? 'pill-neg' : 'pill-neu'}`}>
-                  {example.sentiment}
-                </span>
-                <p>{example.text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
+  return suggestions[primaryCategory] || suggestions.Others
 }
 
 function MetricChip({ label, value }) {

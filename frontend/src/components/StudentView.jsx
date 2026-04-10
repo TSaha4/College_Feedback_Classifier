@@ -50,7 +50,7 @@ export default function StudentView() {
           <div className="eyebrow">Student Portal</div>
           <h1>Share your campus feedback.</h1>
           <p>
-            Submit a short review and CampusLens will identify the category, sentiment, and confidence behind it.
+            Submit a short review and CampusLens will identify the main category, sentiment, and any additional topics it detects.
           </p>
         </div>
       </section>
@@ -117,7 +117,7 @@ export default function StudentView() {
 
               <div className="result-chips">
                 <div className="chip feature-chip">
-                  <div className="chip-label">Category</div>
+                  <div className="chip-label">Primary Category</div>
                   <div className="chip-value text-accent">{result.category}</div>
                   <div className="chip-conf">{result.cat_confidence}% confidence</div>
                 </div>
@@ -128,6 +128,22 @@ export default function StudentView() {
                   <div className="chip-conf">{result.sent_confidence}% confidence</div>
                 </div>
               </div>
+
+              {result.detected_categories?.length > 1 && (
+                <div className="probability-card">
+                  <div className="card-title">Detected Topics</div>
+                  <div className="detected-topic-row">
+                    {result.detected_categories.map(category => (
+                      <span
+                        key={category}
+                        className={`pill ${category === result.category ? 'pill-cat' : 'pill-multi-soft'}`}
+                      >
+                        {category}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {result.all_cats && (
                 <div className="probability-card">
