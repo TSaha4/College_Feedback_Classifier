@@ -73,6 +73,24 @@ sent_model.eval()
 
 print("[CampusLens] Models ready.")
 
+# ── In-memory cache ────────────────────────────────────────────────────────────
+# Evaluation is expensive (batch inference on holdout set). Cache it in memory
+# and only recompute when explicitly invalidated (after re-assess or server restart).
+_eval_cache: dict = {}   # keys: "result", "dirty"
+
+def get_cached_evaluation() -> dict:
+    """Return cached evaluation result; compute and cache on first call."""
+    if not _eval_cache.get("result"):
+        print("[CampusLens] Computing evaluation (first time or invalidated)...")
+        _eval_cache["result"] = evaluate_models()
+    return _eval_cache["result"]
+
+def invalidate_eval_cache():
+    """Call this whenever the models or review labels change."""
+    _eval_cache.clear()
+    print("[CampusLens] Evaluation cache cleared.")
+
+
 
 class ReviewRequest(BaseModel):
     text: str
@@ -536,7 +554,25 @@ def get_analytics():
 
 @app.get("/api/evaluation")
 def get_evaluation():
-    return evaluate_models()
+    """Returns cached evaluation. Fast after first call."""
+    return get_cached_evaluation()
+
+
+@app.get("/api/admin-data")
+def get_admin_data():
+    """
+    Combined endpoint: returns reviews + analytics + evaluation in a single
+    request. Cuts admin panel load from 3 slow calls to 1.
+    Evaluation is served from cache after the first load.
+    """
+    reviews   = list(reversed(load_reviews()))
+    analytics = build_analytics_snapshot()
+    evaluation = get_cached_evaluation()
+    return sanitize_obj({
+        "reviews":    reviews,
+        "analytics":  analytics,
+        "evaluation": evaluation,
+    })
 
 
 @app.post("/api/reviews/reassess")
@@ -557,6 +593,8 @@ def reassess_reviews():
         review["all_cats"] = prediction["all_cats"]
 
     save_reviews(reviews)
+    # Labels changed → evaluation metrics are stale
+    invalidate_eval_cache()
     return {"reassessed": len(reviews)}
 
 

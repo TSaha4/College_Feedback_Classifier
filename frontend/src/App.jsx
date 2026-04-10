@@ -27,6 +27,16 @@ export default function App() {
     )
   }
 
+  // Admin/Chancellor: full-viewport sidebar layout — no shared shell wrapper
+  if (role === 'admin' || role === 'chancellor') {
+    return (
+      <AdminView
+        role={role}
+        onSwitch={() => { setRole(null); setClicks(0) }}
+      />
+    )
+  }
+
   return (
     <div className="shell">
       <header className="topbar">
@@ -35,13 +45,13 @@ export default function App() {
         </div>
         <div className="topbar-role">
           <span className="role-badge" onClick={() => { setRole(null); setClicks(0) }}>
-            {role === 'student' ? 'Student Portal' : role === 'admin' ? 'Admin Dashboard' : 'Chancellor Access'} | Switch
+            Student Portal | Switch
           </span>
         </div>
       </header>
 
       <main className="page-content">
-        {role === 'student' ? <StudentView /> : <AdminView />}
+        <StudentView />
       </main>
     </div>
   )
