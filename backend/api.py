@@ -31,6 +31,7 @@ CAT_MODEL_DIR = os.path.join(ROOT, "cat_model")
 SENT_MODEL_DIR = os.path.join(ROOT, "sent_model")
 REVIEWS_FILE = os.path.join(ROOT, "backend", "system_cache.bin")
 LEGACY_REVIEWS = os.path.join(ROOT, "reviews.json")
+SAMPLE_REVIEWS_FILE = os.path.join(ROOT, "backend", "sample_reviews.json")
 DATASET_PATH = os.path.join(ROOT, "project_dataset.csv")
 EVAL_SPLIT_SEED = 42
 
@@ -144,10 +145,10 @@ def load_reviews():
             with open(REVIEWS_FILE, "rb") as file:
                 encrypted = file.read()
             decrypted = zlib.decompress(base64.b64decode(encrypted)).decode("utf-8")
-            return sanitize_obj(json.loads(decrypted))
+            return merge_sample_reviews(sanitize_obj(json.loads(decrypted)))
         except Exception:
-            return []
-    return []
+            return merge_sample_reviews([])
+    return merge_sample_reviews([])
 
 
 def save_reviews(reviews):
@@ -156,6 +157,33 @@ def save_reviews(reviews):
     encrypted = base64.b64encode(zlib.compress(payload))
     with open(REVIEWS_FILE, "wb") as file:
         file.write(encrypted)
+
+
+def load_sample_reviews():
+    if not os.path.exists(SAMPLE_REVIEWS_FILE):
+        return []
+    try:
+        with open(SAMPLE_REVIEWS_FILE, "r", encoding="utf-8") as file:
+            sample_data = json.loads(file.read())
+        if not isinstance(sample_data, list):
+            return []
+        return sanitize_obj(sample_data)
+    except Exception as exc:
+        print("Failed to load sample reviews:", exc)
+        return []
+
+
+def merge_sample_reviews(reviews):
+    sample_reviews = load_sample_reviews()
+    if not sample_reviews:
+        return reviews
+    existing_ids = {review.get("id") for review in reviews}
+    merged = list(reviews)
+    for sample_review in sample_reviews:
+        if sample_review.get("id") not in existing_ids:
+            merged.append(sample_review)
+            existing_ids.add(sample_review.get("id"))
+    return merged
 
 
 def predict_labels(text: str):

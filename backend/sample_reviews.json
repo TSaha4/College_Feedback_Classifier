@@ -1,0 +1,212 @@
+[
+  {
+    "id": "sample-01",
+    "author": "Student Alpha",
+    "text": "College doesn't organize regular sports and athletic competitions",
+    "category": "Others",
+    "detected_categories": ["Others"],
+    "is_multi_category": false,
+    "sentiment": "Negative",
+    "cat_confidence": 88.5,
+    "sent_confidence": 91.2,
+    "all_cats": {
+      "Academics": 1.8,
+      "Administration": 1.4,
+      "Facilities": 1.6,
+      "Faculty": 1.5,
+      "Hostel": 1.1,
+      "Mess": 1.2,
+      "Others": 91.4
+    },
+    "timestamp": "2026-04-11 09:00"
+  },
+  {
+    "id": "sample-02",
+    "author": "Student Beta",
+    "text": "Medical facilities don't provide health education and preventive care programs",
+    "category": "Facilities",
+    "detected_categories": ["Facilities"],
+    "is_multi_category": false,
+    "sentiment": "Negative",
+    "cat_confidence": 92.1,
+    "sent_confidence": 90.0,
+    "all_cats": {
+      "Academics": 1.2,
+      "Administration": 1.4,
+      "Facilities": 92.1,
+      "Faculty": 1.5,
+      "Hostel": 1.1,
+      "Mess": 1.3,
+      "Others": 1.4
+    },
+    "timestamp": "2026-04-11 09:05"
+  },
+  {
+    "id": "sample-03",
+    "author": "Student Gamma",
+    "text": "Limited practical training opportunities in laboratories and workshop facilities",
+    "category": "Academics",
+    "detected_categories": ["Academics"],
+    "is_multi_category": false,
+    "sentiment": "Negative",
+    "cat_confidence": 89.7,
+    "sent_confidence": 87.6,
+    "all_cats": {
+      "Academics": 89.7,
+      "Administration": 1.6,
+      "Facilities": 2.4,
+      "Faculty": 1.3,
+      "Hostel": 1.1,
+      "Mess": 1.2,
+      "Others": 2.7
+    },
+    "timestamp": "2026-04-11 09:10"
+  },
+  {
+    "id": "sample-04",
+    "author": "Student Delta",
+    "text": "Academic partnerships with other institutions are limited affecting learning opportunities",
+    "category": "Academics",
+    "detected_categories": ["Academics"],
+    "is_multi_category": false,
+    "sentiment": "Negative",
+    "cat_confidence": 90.3,
+    "sent_confidence": 88.8,
+    "all_cats": {
+      "Academics": 90.3,
+      "Administration": 1.2,
+      "Facilities": 1.5,
+      "Faculty": 2.1,
+      "Hostel": 1.0,
+      "Mess": 1.0,
+      "Others": 2.9
+    },
+    "timestamp": "2026-04-11 09:15"
+  },
+  {
+    "id": "sample-05",
+    "author": "Student Epsilon",
+    "text": "Poor quality of academic publications and research output from the institution",
+    "category": "Academics",
+    "detected_categories": ["Academics"],
+    "is_multi_category": false,
+    "sentiment": "Negative",
+    "cat_confidence": 91.0,
+    "sent_confidence": 89.4,
+    "all_cats": {
+      "Academics": 91.0,
+      "Administration": 1.4,
+      "Facilities": 1.2,
+      "Faculty": 1.9,
+      "Hostel": 1.0,
+      "Mess": 1.1,
+      "Others": 3.4
+    },
+    "timestamp": "2026-04-11 09:20"
+  },
+  {
+    "id": "sample-06",
+    "author": "Student Zeta",
+    "text": "The dining environment promotes social interaction though ambiance could improve",
+    "category": "Mess",
+    "detected_categories": ["Mess"],
+    "is_multi_category": false,
+    "sentiment": "Neutral",
+    "cat_confidence": 86.2,
+    "sent_confidence": 78.5,
+    "all_cats": {
+      "Academics": 1.1,
+      "Administration": 1.2,
+      "Facilities": 1.3,
+      "Faculty": 1.2,
+      "Hostel": 1.1,
+      "Mess": 86.2,
+      "Others": 8.9
+    },
+    "timestamp": "2026-04-11 09:25"
+  },
+  {
+    "id": "sample-07",
+    "author": "Student Eta",
+    "text": "Teaching load is distributed among faculty though balance could be better managed",
+    "category": "Faculty",
+    "detected_categories": ["Faculty"],
+    "is_multi_category": false,
+    "sentiment": "Neutral",
+    "cat_confidence": 85.1,
+    "sent_confidence": 80.3,
+    "all_cats": {
+      "Academics": 1.3,
+      "Administration": 1.2,
+      "Facilities": 1.1,
+      "Faculty": 85.1,
+      "Hostel": 1.0,
+      "Mess": 1.1,
+      "Others": 9.2
+    },
+    "timestamp": "2026-04-11 09:30"
+  },
+  {
+    "id": "sample-08",
+    "author": "Student Theta",
+    "text": "Eco-friendly initiatives including waste segregation and recycling are implemented",
+    "category": "Hostel",
+    "detected_categories": ["Hostel"],
+    "is_multi_category": false,
+    "sentiment": "Positive",
+    "cat_confidence": 93.6,
+    "sent_confidence": 92.8,
+    "all_cats": {
+      "Academics": 1.0,
+      "Administration": 1.1,
+      "Facilities": 1.2,
+      "Faculty": 1.0,
+      "Hostel": 93.6,
+      "Mess": 1.1,
+      "Others": 1.0
+    },
+    "timestamp": "2026-04-11 09:35"
+  },
+  {
+    "id": "sample-09",
+    "author": "Student Iota",
+    "text": "Campus provides excellent infrastructure for continuing education programs",
+    "category": "Facilities",
+    "detected_categories": ["Facilities"],
+    "is_multi_category": false,
+    "sentiment": "Positive",
+    "cat_confidence": 92.0,
+    "sent_confidence": 90.4,
+    "all_cats": {
+      "Academics": 1.2,
+      "Administration": 1.1,
+      "Facilities": 92.0,
+      "Faculty": 1.0,
+      "Hostel": 1.0,
+      "Mess": 1.2,
+      "Others": 2.5
+    },
+    "timestamp": "2026-04-11 09:40"
+  },
+  {
+    "id": "sample-10",
+    "author": "Student Kappa",
+    "text": "Love the continental dishes served on weekends, feels like restaurant quality food",
+    "category": "Mess",
+    "detected_categories": ["Mess"],
+    "is_multi_category": false,
+    "sentiment": "Positive",
+    "cat_confidence": 94.8,
+    "sent_confidence": 93.5,
+    "all_cats": {
+      "Academics": 1.0,
+      "Administration": 1.0,
+      "Facilities": 1.0,
+      "Faculty": 1.0,
+      "Hostel": 1.0,
+      "Mess": 94.8,
+      "Others": 0.2
+    },
+    "timestamp": "2026-04-11 09:45"
+  }
+]

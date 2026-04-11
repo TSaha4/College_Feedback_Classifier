@@ -913,10 +913,21 @@ body {
   gap: 1.5rem;
 }
 
+.overview-grid {
+  align-items: start;
+}
+
 .summary-card {
   background:
     linear-gradient(135deg, rgba(13, 122, 122, 0.08), rgba(255,255,255,0.95)),
     var(--bg-card);
+}
+
+.action-plan-card {
+  display: flex;
+  flex-direction: column;
+  max-height: 36rem;
+  overflow: hidden;
 }
 
 .summary-headline {
@@ -1032,6 +1043,12 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
+}
+
+.action-plan-list {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.35rem;
 }
 
 .leaderboard-row,

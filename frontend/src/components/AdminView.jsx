@@ -153,7 +153,7 @@ export default function AdminView() {
 function OverviewPanel({ analytics }) {
   return (
     <div className="panel-stack">
-      <section className="double-grid">
+      <section className="double-grid overview-grid">
         <div className="card summary-card">
           <div className="card-title">executive summary</div>
           <h2 className="summary-headline">{analytics.summary.headline}</h2>
@@ -172,7 +172,7 @@ function OverviewPanel({ analytics }) {
           </div>
         </div>
 
-        <div className="card">
+        <div className="card action-plan-card">
           <div className="card-title">negative action plan</div>
           <ActionPlanList items={analytics.action_plan} />
         </div>
