@@ -108,6 +108,9 @@ sent_model.eval()
 
 print("[CampusLens] Models ready.")
 
+ANALYTICS_CACHE = {"key": None, "value": None}
+EVALUATION_CACHE = {"key": None, "value": None}
+
 
 class ReviewRequest(BaseModel):
     text: str
@@ -157,6 +160,8 @@ def save_reviews(reviews):
     encrypted = base64.b64encode(zlib.compress(payload))
     with open(REVIEWS_FILE, "wb") as file:
         file.write(encrypted)
+    ANALYTICS_CACHE["key"] = None
+    ANALYTICS_CACHE["value"] = None
 
 
 def load_sample_reviews():
@@ -184,6 +189,41 @@ def merge_sample_reviews(reviews):
             merged.append(sample_review)
             existing_ids.add(sample_review.get("id"))
     return merged
+
+
+def get_path_signature(path):
+    if not os.path.exists(path):
+        return ("missing", path)
+    stat = os.stat(path)
+    return (path, stat.st_mtime_ns, stat.st_size)
+
+
+def get_directory_signature(path):
+    if not os.path.exists(path):
+        return ("missing-dir", path)
+
+    signatures = []
+    for root, _, files in os.walk(path):
+        for name in sorted(files):
+            full_path = os.path.join(root, name)
+            stat = os.stat(full_path)
+            signatures.append((full_path, stat.st_mtime_ns, stat.st_size))
+    return tuple(signatures)
+
+
+def get_analytics_cache_key():
+    return (
+        get_path_signature(REVIEWS_FILE),
+        get_path_signature(SAMPLE_REVIEWS_FILE),
+    )
+
+
+def get_evaluation_cache_key():
+    return (
+        get_path_signature(DATASET_PATH),
+        get_directory_signature(CAT_MODEL_DIR),
+        get_directory_signature(SENT_MODEL_DIR),
+    )
 
 
 def predict_labels(text: str):
@@ -578,6 +618,10 @@ def build_negative_action_plan(leaderboard):
 
 
 def build_analytics_snapshot():
+    cache_key = get_analytics_cache_key()
+    if ANALYTICS_CACHE["key"] == cache_key and ANALYTICS_CACHE["value"] is not None:
+        return ANALYTICS_CACHE["value"]
+
     reviews = load_reviews()
     leaderboard = get_leaderboard_stats(reviews)
     clusters = build_topic_clusters(reviews)
@@ -603,7 +647,7 @@ def build_analytics_snapshot():
         for date, count in sorted(timeline.items())
     ]
 
-    return sanitize_obj(
+    snapshot = sanitize_obj(
         {
             "overview": {
                 "total_reviews": len(reviews),
@@ -631,6 +675,9 @@ def build_analytics_snapshot():
             "summary": build_summary_insights(reviews, leaderboard, clusters),
         }
     )
+    ANALYTICS_CACHE["key"] = cache_key
+    ANALYTICS_CACHE["value"] = snapshot
+    return snapshot
 
 
 @app.get("/api/health")
@@ -667,7 +714,14 @@ def get_analytics():
 
 @app.get("/api/evaluation")
 def get_evaluation():
-    return evaluate_models()
+    cache_key = get_evaluation_cache_key()
+    if EVALUATION_CACHE["key"] == cache_key and EVALUATION_CACHE["value"] is not None:
+        return EVALUATION_CACHE["value"]
+
+    evaluation = evaluate_models()
+    EVALUATION_CACHE["key"] = cache_key
+    EVALUATION_CACHE["value"] = evaluation
+    return evaluation
 
 
 @app.post("/api/reviews/reassess")

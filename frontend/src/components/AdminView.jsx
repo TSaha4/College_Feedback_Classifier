@@ -1,60 +1,171 @@
 import { useCallback, useEffect, useState } from 'react'
 
+const ADMIN_CACHE_KEY = 'campuslens-admin-cache'
+
+let adminViewCache = {
+  reviews: null,
+  analytics: null,
+  evaluation: null,
+}
+
+function loadAdminCache() {
+  if (adminViewCache.reviews && adminViewCache.analytics) {
+    return adminViewCache
+  }
+
+  try {
+    const rawCache = sessionStorage.getItem(ADMIN_CACHE_KEY)
+    if (!rawCache) return adminViewCache
+
+    const parsed = JSON.parse(rawCache)
+    adminViewCache = {
+      reviews: Array.isArray(parsed.reviews) ? parsed.reviews : null,
+      analytics: parsed.analytics || null,
+      evaluation: parsed.evaluation || null,
+    }
+  } catch (error) {
+    console.error('Failed to restore admin cache', error)
+  }
+
+  return adminViewCache
+}
+
+function saveAdminCache(nextCache) {
+  adminViewCache = {
+    ...adminViewCache,
+    ...nextCache,
+  }
+
+  try {
+    sessionStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify(adminViewCache))
+  } catch (error) {
+    console.error('Failed to persist admin cache', error)
+  }
+}
+
+function clearAdminCache() {
+  adminViewCache = {
+    reviews: null,
+    analytics: null,
+    evaluation: null,
+  }
+
+  try {
+    sessionStorage.removeItem(ADMIN_CACHE_KEY)
+  } catch (error) {
+    console.error('Failed to clear admin cache', error)
+  }
+}
+
 export default function AdminView() {
+  const cachedData = loadAdminCache()
   const [tab, setTab] = useState('overview')
-  const [reviews, setReviews] = useState([])
-  const [analytics, setAnalytics] = useState(null)
-  const [evaluation, setEvaluation] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [reviews, setReviews] = useState(cachedData.reviews || [])
+  const [analytics, setAnalytics] = useState(cachedData.analytics)
+  const [evaluation, setEvaluation] = useState(cachedData.evaluation)
+  const [loadingDashboard, setLoadingDashboard] = useState(!cachedData.reviews || !cachedData.analytics)
+  const [loadingEvaluation, setLoadingEvaluation] = useState(false)
   const [search, setSearch] = useState('')
   const [filterSent, setFilterSent] = useState('')
   const [filterCat, setFilterCat] = useState('')
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
+  const fetchDashboard = useCallback(async ({ force = false } = {}) => {
+    if (!force && adminViewCache.reviews && adminViewCache.analytics) {
+      setReviews(adminViewCache.reviews)
+      setAnalytics(adminViewCache.analytics)
+      setLoadingDashboard(false)
+      return
+    }
+
+    setLoadingDashboard(true)
     try {
-      const [reviewsRes, analyticsRes, evaluationRes] = await Promise.all([
+      const [reviewsRes, analyticsRes] = await Promise.all([
         fetch('/api/reviews'),
         fetch('/api/analytics'),
-        fetch('/api/evaluation'),
       ])
 
-      setReviews(await reviewsRes.json())
-      setAnalytics(await analyticsRes.json())
-      setEvaluation(await evaluationRes.json())
+      const nextReviews = await reviewsRes.json()
+      const nextAnalytics = await analyticsRes.json()
+      setReviews(nextReviews)
+      setAnalytics(nextAnalytics)
+      saveAdminCache({
+        reviews: nextReviews,
+        analytics: nextAnalytics,
+      })
     } catch (error) {
       console.error(error)
     } finally {
-      setLoading(false)
+      setLoadingDashboard(false)
+    }
+  }, [])
+
+  const fetchEvaluation = useCallback(async ({ force = false } = {}) => {
+    if (!force && adminViewCache.evaluation) {
+      setEvaluation(adminViewCache.evaluation)
+      return
+    }
+
+    setLoadingEvaluation(true)
+    try {
+      const evaluationRes = await fetch('/api/evaluation')
+      const nextEvaluation = await evaluationRes.json()
+      setEvaluation(nextEvaluation)
+      saveAdminCache({ evaluation: nextEvaluation })
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setLoadingEvaluation(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
+    fetchDashboard()
+  }, [fetchDashboard])
+
+  useEffect(() => {
+    if (tab === 'performance' && !evaluation && !loadingEvaluation) {
+      fetchEvaluation()
+    }
+  }, [evaluation, fetchEvaluation, loadingEvaluation, tab])
 
   async function deleteReview(id) {
     if (!confirm('Delete this review?')) return
     await fetch(`/api/reviews/${encodeURIComponent(id)}`, { method: 'DELETE' })
-    fetchData()
+    clearAdminCache()
+    fetchDashboard({ force: true })
   }
 
   async function rusticateStudent(id) {
     if (!confirm('Take action and rusticate this student?')) return
     await fetch(`/api/reviews/${encodeURIComponent(id)}/rusticate`, { method: 'POST' })
-    fetchData()
+    clearAdminCache()
+    fetchDashboard({ force: true })
   }
 
   async function reassessReviews() {
     if (!confirm('Re-classify all reviews using the current models? This may take a moment.')) return
-    setLoading(true)
+    setLoadingDashboard(true)
+    setLoadingEvaluation(true)
     try {
       await fetch('/api/reviews/reassess', { method: 'POST' })
-      await fetchData()
+      clearAdminCache()
+      await Promise.all([
+        fetchDashboard({ force: true }),
+        tab === 'performance' ? fetchEvaluation({ force: true }) : Promise.resolve(),
+      ])
     } catch (error) {
       console.error(error)
-      setLoading(false)
+      setLoadingDashboard(false)
+      setLoadingEvaluation(false)
     }
+  }
+
+  async function refreshAdminData() {
+    clearAdminCache()
+    await Promise.all([
+      fetchDashboard({ force: true }),
+      tab === 'performance' ? fetchEvaluation({ force: true }) : Promise.resolve(),
+    ])
   }
 
   const filteredReviews = reviews.filter(review => {
@@ -88,10 +199,10 @@ export default function AdminView() {
           </p>
         </div>
         <div className="hero-actions">
-          <button className="btn btn-primary" onClick={reassessReviews} disabled={loading}>
-            {loading ? 'processing...' : 'reassess reviews'}
+          <button className="btn btn-primary" onClick={reassessReviews} disabled={loadingDashboard || loadingEvaluation}>
+            {loadingDashboard || loadingEvaluation ? 'processing...' : 'reassess reviews'}
           </button>
-          <button className="btn btn-ghost" onClick={fetchData}>
+          <button className="btn btn-ghost" onClick={refreshAdminData} disabled={loadingDashboard || loadingEvaluation}>
             refresh
           </button>
         </div>
@@ -118,7 +229,7 @@ export default function AdminView() {
         ))}
       </div>
 
-      {loading || !analytics || !evaluation ? (
+      {loadingDashboard || !analytics ? (
         <div className="loading-panel">
           <span className="spinner spinner-dark" />
         </div>
@@ -128,7 +239,13 @@ export default function AdminView() {
             <OverviewPanel analytics={analytics} />
           )}
           {tab === 'performance' && (
-            <PerformancePanel evaluation={evaluation} />
+            loadingEvaluation || !evaluation ? (
+              <div className="loading-panel">
+                <span className="spinner spinner-dark" />
+              </div>
+            ) : (
+              <PerformancePanel evaluation={evaluation} />
+            )
           )}
           {tab === 'reviews' && (
             <ReviewsFeed
